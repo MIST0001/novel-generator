@@ -12,13 +12,13 @@ import google.generativeai as genai
 app = Flask(__name__)
 
 # 許可するオリジン（あなたのNetlifyサイトのURL）を指定
-	origins = [
-		"https://r18novel-generator-mist.netlify.app",
-		"http://127.0.0.1:5500", # ローカルテスト用も念のため追加（ポート番号は環境に合わせて）
-		"http://localhost:5500"  # ローカルテスト用
-	]
+origins = [
+	"https://r18novel-generator-mist.netlify.app",
+	"http://127.0.0.1:5500", # ローカルテスト用も念のため追加（ポート番号は環境に合わせて）
+	"http://localhost:5500"  # ローカルテスト用
+]
 
-	CORS(app, resources={r"/generate": {"origins": origins}})
+CORS(app, resources={r"/generate": {"origins": origins}})
 # --- Google Generative AIの設定 ---
 
 try:
