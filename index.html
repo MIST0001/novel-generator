@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI小説ジェネレーター</title>
+    <!-- Tailwind CSSを読み込みます -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* ボタンの無効化状態のスタイル */
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        /* 簡単なスピナーアニメーション */
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #09f;
+            animation: spin 1s ease infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* 結果表示エリアのスタイル */
+        #result-novel {
+            white-space: pre-wrap; /* 改行を維持 */
+            word-wrap: break-word; /* 長い単語を折り返す */
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            max-height: 500px;
+            overflow-y: auto;
+            line-height: 1.7;
+        }
+        /* 詳細セクションのスタイル */
+        details {
+            border-radius: 0.5rem;
+            border: 1px solid #e5e7eb;
+        }
+        details summary {
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            font-weight: 500;
+            background-color: #f9fafb;
+        }
+        details div {
+            padding: 1rem;
+            border-top: 1px solid #e5e7eb;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen font-sans">
+
+    <div class="w-full max-w-3xl mx-auto p-8 bg-white rounded-xl shadow-lg">
+        
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-gray-800">AI小説ジェネレーター</h1>
+            <p class="text-gray-500 mt-2">あなたの考えたテーマから、世界に一つだけの物語を創り出します。</p>
+        </header>
+
+        <main>
+            <!-- テーマ入力エリア -->
+            <div class="mb-6">
+                <label for="theme-input" class="block mb-2 text-sm font-medium text-gray-700">小説のテーマ</label>
+                <textarea 
+                    id="theme-input" 
+                    rows="4" 
+                    class="w-full p-4 text-gray-700 bg-gray-50 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition"
+                    placeholder="例：クールな騎士団長との契約結婚"
+                ></textarea>
+            </div>
+
+            <!-- 生成ボタン -->
+            <button 
+                id="generate-button"
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:shadow-outline transition duration-300"
+            >
+                小説を生成する
+            </button>
+
+            <!-- ローディング表示 -->
+            <div id="loading" class="text-center mt-6" style="display: none;">
+                <div class="spinner"></div>
+                <p class="text-gray-600">AIが物語を紡いでいます。しばらくお待ちください...</p>
+            </div>
+
+            <!-- エラーメッセージ表示 -->
+            <div id="error-message" class="hidden mt-4 p-4 bg-red-100 text-red-700 border border-red-400 rounded-lg"></div>
+        </main>
+
+        <!-- ★★★ 結果表示セクション ★★★ -->
+        <section id="results-container" class="hidden mt-10">
+            <h2 class="text-2xl font-bold text-gray-800 border-b pb-2 mb-4">生成結果</h2>
+            
+            <!-- タイトル -->
+            <h3 id="result-title" class="text-xl font-semibold text-gray-900"></h3>
+            <!-- あらすじ -->
+            <p id="result-synopsis" class="text-gray-600 mt-2 mb-6 italic"></p>
+            
+            <!-- ダウンロードボタン -->
+            <button id="download-button" class="mb-4 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline transition duration-300">
+                TXTダウンロード
+            </button>
+
+            <!-- 小説本文 -->
+            <div id="result-novel"></div>
+
+            <!-- 生成過程の詳細（折りたたみ） -->
+            <details class="mt-6">
+                <summary>生成過程の詳細を表示</summary>
+                <div class="space-y-4">
+                    <div>
+                        <h4 class="font-semibold">プロット</h4>
+                        <pre id="result-plot" class="text-sm bg-gray-50 p-2 rounded mt-1 whitespace-pre-wrap"></pre>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold">編集者レビュー</h4>
+                        <pre id="result-review" class="text-sm bg-gray-50 p-2 rounded mt-1 whitespace-pre-wrap"></pre>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold">タイトル候補一覧</h4>
+                        <pre id="result-all-titles" class="text-sm bg-gray-50 p-2 rounded mt-1 whitespace-pre-wrap"></pre>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold">あらすじ候補一覧</h4>
+                        <pre id="result-all-synopses" class="text-sm bg-gray-50 p-2 rounded mt-1 whitespace-pre-wrap"></pre>
+                    </div>
+                </div>
+            </details>
+        </section>
+    </div>
+
+    <script>
+        // --- DOM要素の取得 ---
+        const themeInput = document.getElementById('theme-input');
+        const generateButton = document.getElementById('generate-button');
+        const loadingIndicator = document.getElementById('loading');
+        const errorMessageDiv = document.getElementById('error-message');
+        const resultsContainer = document.getElementById('results-container');
+        const downloadButton = document.getElementById('download-button');
+
+        // 結果表示用のDOM要素
+        const resultTitle = document.getElementById('result-title');
+        const resultSynopsis = document.getElementById('result-synopsis');
+        const resultNovel = document.getElementById('result-novel');
+        const resultPlot = document.getElementById('result-plot');
+        const resultReview = document.getElementById('result-review');
+        const resultAllTitles = document.getElementById('result-all-titles');
+        const resultAllSynopses = document.getElementById('result-all-synopses');
+
+        // --- バックエンドAPIのURL ---
+        const BACKEND_URL = 'http://127.0.0.1:5001/generate';
+
+        /**
+         * テキストを指定されたファイル名でダウンロードさせる関数
+         * @param {string} filename - ダウンロードするファイル名
+         * @param {string} text - ダウンロードするテキストの内容
+         */
+        function downloadText(filename, text) {
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            document.body.appendChild(a);
+            a.style.display = 'none';
+            a.href = url;
+            a.download = filename;
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }
+
+        // --- イベントリスナーの設定 ---
+        generateButton.addEventListener('click', async () => {
+            const theme = themeInput.value.trim();
+            if (!theme) {
+                alert('小説のテーマを入力してください。');
+                return;
+            }
+
+            // UIの状態を更新（ローディング開始）
+            generateButton.disabled = true;
+            loadingIndicator.style.display = 'block';
+            errorMessageDiv.classList.add('hidden');
+            resultsContainer.classList.add('hidden'); // 結果を非表示に
+
+            try {
+                const response = await fetch(BACKEND_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ theme: theme }),
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || `サーバーエラー: ${response.status}`);
+                }
+
+                // ★結果をページに表示
+                resultTitle.textContent = data.selected_title || '（タイトルなし）';
+                resultSynopsis.textContent = data.selected_synopsis || '（あらすじなし）';
+                resultNovel.textContent = data.final_novel || '（本文なし）';
+                resultPlot.textContent = data.plot || '';
+                resultReview.textContent = data.review || '';
+                resultAllTitles.textContent = data.all_titles || '';
+                resultAllSynopses.textContent = data.all_synopses || '';
+                
+                // 結果コンテナを表示
+                resultsContainer.classList.remove('hidden');
+
+            } catch (error) {
+                console.error('小説の生成に失敗しました:', error);
+                errorMessageDiv.textContent = `エラーが発生しました: ${error.message}`;
+                errorMessageDiv.classList.remove('hidden');
+            } finally {
+                generateButton.disabled = false;
+                loadingIndicator.style.display = 'none';
+            }
+        });
+
+        // ★ダウンロードボタンのイベントリスナー
+        downloadButton.addEventListener('click', () => {
+            const title = resultTitle.textContent;
+            const synopsis = resultSynopsis.textContent;
+            const novel = resultNovel.textContent;
+
+            // ダウンロードするテキストの内容を整形
+            const fileContent = `タイトル: ${title}\n\nあらすじ:\n${synopsis}\n\n---\n\n${novel}`;
+            
+            // ファイル名をタイトルから生成（特殊文字を除去）
+            const fileName = (title || 'novel').replace(/[\\/:*?"<>|]/g, '') + '.txt';
+
+            downloadText(fileName, fileContent);
+        });
+    </script>
+</body>
+</html>
